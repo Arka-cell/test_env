@@ -1,0 +1,15 @@
+on:
+  push:
+    branches:
+      - master
+      - main
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Sagittarius CLI and Deploy Application
+        run: "mkdir -p $HOME/.local/bin\ncurl -L https://github.com/sagittarius-cloud/sagittarius-cli/releases/download/v1.0.2/sagittarius-linux
+          -o $HOME/.local/bin/sag\nchmod +x $HOME/.local/bin/sag\necho \"$HOME/.local/bin\"\
+          \ >> $GITHUB_PATH\nalias sag=/usr/local/bin/sagittarius\nsag login --token
+          ${{ secrets.SAGITTARIUS_TOKEN }}\nsag deploy --id 91 --action restart\n"
+
