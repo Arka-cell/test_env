@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SQL Query Interface</title>
+    <style>
+      :root {
+        --primary: #3b82f6;
+        --primary-dark: #1d4ed8;
+        --bg: #f9fafb;
+        --text: #1f2937;
+        --border: #e5e7eb;
+      }
+
+      body {
+        font-family: "Inter", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+      }
+
+      .container {
+        margin-top: 50px;
+        background: white;
+        padding: 30px;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-width: 800px;
+        transition: all 0.3s ease;
+      }
+
+      h2 {
+        text-align: center;
+        color: var(--primary-dark);
+        margin-bottom: 20px;
+        letter-spacing: 0.5px;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        resize: vertical;
+        font-size: 15px;
+        transition: border-color 0.2s;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      button {
+        align-self: flex-start;
+        background: var(--primary);
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: var(--primary-dark);
+      }
+
+      #result {
+        margin-top: 30px;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+      }
+
+      th {
+        background: var(--primary);
+        color: white;
+        text-align: left;
+        padding: 10px;
+      }
+
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      tr:nth-child(even) {
+        background-color: #f3f4f6;
+      }
+
+      .error {
+        color: #dc2626;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        padding: 10px;
+        border-radius: 8px;
+      }
+
+      .success {
+        color: #065f46;
+        background: #d1fae5;
+        border: 1px solid #a7f3d0;
+        padding: 10px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>SQL Query Interface</h2>
+      <form id="sql-form">
+        <textarea
+          id="sql-input"
+          placeholder="Enter your SQL query here..."
+        ></textarea>
+        <button type="submit">Run Query</button>
+      </form>
+      <div id="result"></div>
+    </div>
+
+    <script>
+      document.getElementById("sql-form").onsubmit = async function (e) {
+        e.preventDefault();
+        const sql = document.getElementById("sql-input").value.trim();
+        if (!sql) return alert("Please enter a SQL query.");
+
+        const res = await fetch("/run_sql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sql }),
+        });
+        const data = await res.json();
+        const resultDiv = document.getElementById("result");
+
+        if (data.error) {
+          resultDiv.innerHTML = `<div class="error">❌ ${data.error}</div>`;
+        } else if (data.type === "select") {
+          let html = "<table><thead><tr>";
+          for (const col of data.columns) html += `<th>${col}</th>`;
+          html += "</tr></thead><tbody>";
+          for (const row of data.rows) {
+            html += "<tr>";
+            for (const col of data.columns) html += `<td>${row[col]}</td>`;
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+          resultDiv.innerHTML = html;
+        } else {
+          resultDiv.innerHTML = `<div class="success">✅ Query OK. ${
+            data.rowcount || ""
+          }</div>`;
+        }
+      };
+    </script>
+  </body>
+</html>

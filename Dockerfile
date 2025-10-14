@@ -7,11 +7,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app files
+
+# Copy app files and templates
 COPY app.py .
+COPY templates ./templates
 
-# Expose Flask port
-EXPOSE 5000
 
-# Run the app
+# Expose port 9998
+EXPOSE 9998
+
+# Run the app on port 9998
 CMD ["python", "app.py"]
