@@ -10,6 +10,7 @@ POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", 5432)
 
 # Connect to PostgreSQL at app startup
 try:
@@ -18,6 +19,7 @@ try:
         dbname=POSTGRES_DB,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
+        port=POSTGRES_PORT,
     )
     print("Connected to PostgreSQL successfully.")
 except Exception as e:
