@@ -62,6 +62,7 @@ def run_sql():
                 conn.commit()
                 return jsonify({"type": "other", "rowcount": cur.rowcount})
     except Exception as e:
+        conn.rollback()
         return jsonify({"error": str(e)}), 400
 
 
