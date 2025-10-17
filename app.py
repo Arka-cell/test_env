@@ -1,7 +1,7 @@
 import os
 from flask import Flask, jsonify, render_template, request
 import psycopg2
-
+import time
 
 app = Flask(__name__)
 
@@ -12,19 +12,26 @@ POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", 5432)
 
-# Connect to PostgreSQL at app startup
-try:
-    conn = psycopg2.connect(
-        host=POSTGRES_HOST,
-        dbname=POSTGRES_DB,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD,
-        port=POSTGRES_PORT,
-    )
-    print("Connected to PostgreSQL successfully.")
-except Exception as e:
-    print(f"Failed to connect to PostgreSQL: {e}")
-    raise e
+
+def connect_to_db():
+    # Connect to PostgreSQL at app startup
+    try:
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+            port=POSTGRES_PORT,
+        )
+        print("Connected to PostgreSQL successfully.")
+    except Exception as e:
+        print(f"Failed to connect to PostgreSQL: {e}")
+        time.sleep(5)
+        return connect_to_db()
+    return conn
+
+
+conn = connect_to_db()
 
 
 @app.route("/metadata")
