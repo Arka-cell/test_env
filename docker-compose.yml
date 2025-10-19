@@ -21,5 +21,7 @@ services:
       POSTGRES_PASSWORD: mypassword
     depends_on:
       - db
+    volumes:
+      - .:/app
 volumes:
   pgdata:

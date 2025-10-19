@@ -2,6 +2,7 @@ import os
 from flask import Flask, jsonify, render_template, request
 import psycopg2
 import time
+import traceback
 
 app = Flask(__name__)
 
@@ -31,9 +32,6 @@ def connect_to_db():
     return conn
 
 
-conn = connect_to_db()
-
-
 @app.route("/metadata")
 def index():
     return jsonify(
@@ -54,24 +52,34 @@ def home():
 # Endpoint to run SQL queries
 @app.route("/run_sql", methods=["POST"])
 def run_sql():
+    conn = connect_to_db()
     data = request.get_json()
     sql = data.get("sql", "")
     if not sql:
         return jsonify({"error": "No SQL provided."}), 400
+    # try:
+    conn.rollback()  # ensure we're not in aborted state
     try:
         with conn.cursor() as cur:
+            print("Executed SQL:", sql)
+
             cur.execute(sql)
             if sql.strip().lower().startswith("select"):
                 columns = [desc[0] for desc in cur.description]
                 rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+                conn.close()
+                print()
                 return jsonify({"type": "select", "columns": columns, "rows": rows})
             else:
                 conn.commit()
+                conn.close()
                 return jsonify({"type": "other", "rowcount": cur.rowcount})
     except Exception as e:
+        traceback.print_exc()
         conn.rollback()
+        conn.close()
         return jsonify({"error": str(e)}), 400
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=9998)
+    app.run(host="0.0.0.0", port=9998, debug=True)
