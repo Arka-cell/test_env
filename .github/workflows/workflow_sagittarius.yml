@@ -1,0 +1,24 @@
+on:
+  push:
+    branches:
+      - master
+      - main
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preinstall Sagittario CLI
+        run: mkdir -p $HOME/.local/bin
+      - name: Download Sagittario CLI
+        run: curl -L 
+          https://github.com/sagittarius-cloud/sagittarius-cli/releases/download/v1.0.5/sagittarius-linux
+          -o $HOME/.local/bin/sag
+      - name: Make Sagittario CLI executable
+        run: chmod +x $HOME/.local/bin/sag
+      - name: Add Sagittario CLI to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH && alias sag=/usr/local/bin/sag
+      - name: Login to Sagittario
+        run: sag login --token ${{ secrets.SAGITTARIUS_TOKEN }}
+      - name: Deploy to Sagittarius
+        run: sag deploy --id 329 --action restart
+
