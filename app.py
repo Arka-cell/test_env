@@ -1,8 +1,7 @@
 import os
 from flask import Flask, jsonify, render_template, request
-from psycopg2 import pool
+import psycopg2
 import logging
-from contextlib import contextmanager
 from urllib.parse import urlparse
 
 app = Flask(__name__)
@@ -14,64 +13,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Read PostgreSQL connection info from environment variables
-POSTGRES_CONNECTION_STRING = os.getenv(
+CONNECTION_STRING = os.getenv(
     "CONNECTION_STRING", "postgresql://myuser:mypassword@db:5432/mydb"
 )
 
-# Initialize connection pool
-connection_pool = None
+# Parse connection string
+parsed = urlparse(CONNECTION_STRING)
+DB_HOST = parsed.hostname
+DB_PORT = parsed.port or 5432
+DB_NAME = parsed.path[1:]  # Remove leading '/'
+DB_USER = parsed.username
+DB_PASSWORD = parsed.password
 
 
-def parse_postgres_url(url):
-    """Parse PostgreSQL connection URL into components"""
-    parsed = urlparse(url)
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "database": parsed.path[1:],  # Remove leading '/'
-        "user": parsed.username,
-        "password": parsed.password,
-    }
-
-
-def init_connection_pool():
-    """Initialize PostgreSQL connection pool"""
-    global connection_pool
-    try:
-        conn_params = parse_postgres_url(POSTGRES_CONNECTION_STRING)
-        connection_pool = pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
-            host=conn_params["host"],
-            port=conn_params["port"],
-            database=conn_params["database"],
-            user=conn_params["user"],
-            password=conn_params["password"],
-        )
-        logger.info("PostgreSQL connection pool created successfully")
-    except Exception as e:
-        logger.error(
-            f"Failed to create connection pool: {e} - Connection string value used is:\n {POSTGRES_CONNECTION_STRING}"
-        )
-        logger.error(f"Connection string value used is:\n {POSTGRES_CONNECTION_STRING}")
-        raise
-
-
-@contextmanager
 def get_db_connection():
-    """Context manager for database connections"""
-    conn = None
-    try:
-        conn = connection_pool.getconn()
-        yield conn
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Database error: {e}")
-        raise
-    finally:
-        if conn:
-            connection_pool.putconn(conn)
+    """Create a new database connection"""
+    return psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, database=DB_NAME, user=DB_USER, password=DB_PASSWORD
+    )
 
 
 @app.route("/metadata")
@@ -96,10 +55,12 @@ def home():
 def health():
     """Health check endpoint"""
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                cur.fetchone()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        cur.close()
+        conn.close()
         return jsonify({"status": "healthy", "database": "connected"}), 200
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -123,51 +84,66 @@ def run_sql():
     if ";" in sql[:-1]:  # Allow trailing semicolon
         return jsonify({"error": "Multiple statements not allowed"}), 400
 
+    conn = None
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                logger.info(f"Executing SQL: {sql[:100]}...")  # Log first 100 chars
+        conn = get_db_connection()
+        cur = conn.cursor()
 
-                cur.execute(sql)
+        logger.info(f"Executing SQL: {sql[:100]}...")  # Log first 100 chars
 
-                # Handle SELECT queries
-                if sql.lower().startswith("select"):
-                    if cur.description:
-                        columns = [desc[0] for desc in cur.description]
-                        rows = cur.fetchall()
-                        # Convert rows to list of dicts
-                        result_rows = [dict(zip(columns, row)) for row in rows]
+        cur.execute(sql)
 
-                        return jsonify(
-                            {
-                                "type": "select",
-                                "columns": columns,
-                                "rows": result_rows,
-                                "row_count": len(result_rows),
-                            }
-                        )
-                    else:
-                        return jsonify(
-                            {
-                                "type": "select",
-                                "columns": [],
-                                "rows": [],
-                                "row_count": 0,
-                            }
-                        )
+        # Handle SELECT queries
+        if sql.lower().startswith("select"):
+            if cur.description:
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+                # Convert rows to list of dicts
+                result_rows = [dict(zip(columns, row)) for row in rows]
 
-                # Handle INSERT, UPDATE, DELETE, etc.
-                else:
-                    conn.commit()
-                    return jsonify(
-                        {
-                            "type": "modify",
-                            "rows_affected": cur.rowcount,
-                            "message": "Query executed successfully",
-                        }
-                    )
+                cur.close()
+                conn.close()
+
+                return jsonify(
+                    {
+                        "type": "select",
+                        "columns": columns,
+                        "rows": result_rows,
+                        "row_count": len(result_rows),
+                    }
+                )
+            else:
+                cur.close()
+                conn.close()
+
+                return jsonify(
+                    {
+                        "type": "select",
+                        "columns": [],
+                        "rows": [],
+                        "row_count": 0,
+                    }
+                )
+
+        # Handle INSERT, UPDATE, DELETE, etc.
+        else:
+            conn.commit()
+            rows_affected = cur.rowcount
+            cur.close()
+            conn.close()
+
+            return jsonify(
+                {
+                    "type": "modify",
+                    "rows_affected": rows_affected,
+                    "message": "Query executed successfully",
+                }
+            )
 
     except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
         logger.error(f"SQL execution error: {e}", exc_info=True)
         return jsonify({"error": str(e), "type": "execution_error"}), 400
 
@@ -185,19 +161,9 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
-def cleanup():
-    """Cleanup function to close connection pool"""
-    global connection_pool
-    if connection_pool:
-        connection_pool.closeall()
-        logger.info("Connection pool closed")
-
-
 if __name__ == "__main__":
     try:
-        init_connection_pool()
-        app.run(host="0.0.0.0", port=9998, debug=False)  # Set debug=False in production
+        logger.info(f"Connecting to database at {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        app.run(host="0.0.0.0", port=9998, debug=False)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
-    finally:
-        cleanup()
