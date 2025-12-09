@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Parse connection string
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432").replace("'", "")
+DB_PORT = int(os.getenv("DB_PORT", "5432").replace("'", ""))
 DB_NAME = os.getenv("DB_NAME", "mydb")
 DB_USER = os.getenv("DB_USER", "myuser")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "mypassword")
@@ -27,7 +27,7 @@ def get_db_connection():
     """Create a new database connection"""
     return psycopg2.connect(
         host=DB_HOST,
-        port=int(DB_PORT),
+        port=DB_PORT,
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
