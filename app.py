@@ -13,17 +13,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Read PostgreSQL connection info from environment variables
-CONNECTION_STRING = os.getenv(
-    "CONNECTION_STRING", "postgresql://myuser:mypassword@db:5432/mydb"
-)
 
 # Parse connection string
-parsed = urlparse(CONNECTION_STRING)
-DB_HOST = parsed.hostname
-DB_PORT = parsed.port or 5432
-DB_NAME = parsed.path[1:]  # Remove leading '/'
-DB_USER = parsed.username
-DB_PASSWORD = parsed.password
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "mydb")
+DB_USER = os.getenv("DB_USER", "myuser")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "mypassword")
 
 
 def get_db_connection():
