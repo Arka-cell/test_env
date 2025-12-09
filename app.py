@@ -3,6 +3,7 @@ from flask import Flask, jsonify, render_template, request
 from psycopg2 import pool
 import logging
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
@@ -21,12 +22,31 @@ POSTGRES_CONNECTION_STRING = os.getenv(
 connection_pool = None
 
 
+def parse_postgres_url(url):
+    """Parse PostgreSQL connection URL into components"""
+    parsed = urlparse(url)
+    return {
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "database": parsed.path[1:],  # Remove leading '/'
+        "user": parsed.username,
+        "password": parsed.password,
+    }
+
+
 def init_connection_pool():
     """Initialize PostgreSQL connection pool"""
     global connection_pool
     try:
+        conn_params = parse_postgres_url(POSTGRES_CONNECTION_STRING)
         connection_pool = pool.ThreadedConnectionPool(
-            minconn=1, maxconn=10, dsn=POSTGRES_CONNECTION_STRING
+            minconn=1,
+            maxconn=10,
+            host=conn_params["host"],
+            port=conn_params["port"],
+            database=conn_params["database"],
+            user=conn_params["user"],
+            password=conn_params["password"],
         )
         logger.info("PostgreSQL connection pool created successfully")
     except Exception as e:
