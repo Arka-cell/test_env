@@ -50,7 +50,10 @@ def init_connection_pool():
         )
         logger.info("PostgreSQL connection pool created successfully")
     except Exception as e:
-        logger.error(f"Failed to create connection pool: {e}")
+        logger.error(
+            f"Failed to create connection pool: {e} - Connection string value used is:\n {POSTGRES_CONNECTION_STRING}"
+        )
+        logger.error(f"Connection string value used is:\n {POSTGRES_CONNECTION_STRING}")
         raise
 
 
