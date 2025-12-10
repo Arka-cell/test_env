@@ -25,7 +25,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "mypassword")
 
 def get_db_connection():
     """Create a new database connection"""
-    print(f"Password: {DB_PASSWORD}")
+    logger.info(f"Password: {DB_PASSWORD}")
     return psycopg2.connect(
         host=DB_HOST,
         port=DB_PORT,
